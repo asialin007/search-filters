@@ -1,0 +1,3 @@
+# Netlify 静态站点：发布目录为项目根目录（index.html 在根路径）
+[build]
+  publish = "."
