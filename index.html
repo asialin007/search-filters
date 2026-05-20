@@ -1,0 +1,1832 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=390, initial-scale=1, viewport-fit=cover" />
+    <title>全部筛选</title>
+    <style>
+      /**
+       * 设计 token 对齐 Figma「All Filters」节点与唯品会移动端设计系统变量（主稿 MCP get_variable_defs）。
+       * 默认视口宽度 390px；字号使用 px，侧栏固定 80px，浮层最大宽度 390px。
+       * 图标：仅使用矢量 SVG 资源（assets/icons/*.svg），不使用 PNG/JPEG 等位图。
+       * 全屏背景：主稿 bg 为屏摄，本地使用 assets/images/page-bg.jpg（与设计导出一致）。
+       */
+      :root {
+        --color-text-primary: #1b1b1b;
+        --color-text-secondary: #5f5f5f;
+        --color-text-tertiary: #989898;
+        --color-text-disabled: #c6c6c6;
+        --color-brand: #ff0777;
+        --color-brand-alpha-4: rgba(255, 7, 119, 0.04);
+        --color-brand-light: rgb(255, 17, 160);
+        --color-surface-default: #ffffff;
+        --color-surface-secondary: #f7f7f7;
+        --color-surface-tertiary: #f2f2f2;
+        --color-inverse: #1b1b1b;
+        --color-overlay: rgba(27, 27, 27, 0.85);
+        --color-border-subtle: rgba(27, 27, 27, 0.08);
+
+        --radius-sheet-top: 12px;
+        --radius-label: 8px;
+        --radius-footer-btn: 12px;
+        --radius-sidebar-indicator-v: 6px;
+
+        --space-4: 4px;
+        --space-6: 6px;
+        --space-8: 8px;
+        --space-10: 10px;
+        --space-12: 12px;
+        --space-14: 14px;
+        --space-16: 16px;
+        --space-20: 20px;
+
+        --font-stack: 'PingFang SC', -apple-system, BlinkMacSystemFont, sans-serif;
+
+        --title-page-size: 18px;
+        --title-page-lh: 22px;
+
+        --title-group-size: 13px;
+        --title-group-lh: 18px;
+
+        --body-12-size: 12px;
+        --body-12-lh: 16px;
+
+        --sidebar-12-size: 12px;
+        --sidebar-12-lh: 14px;
+
+        --footer-btn-size: 16px;
+        --footer-btn-lh: 20px;
+
+        --design-viewport-width: 390px;
+        --sheet-max-width: var(--design-viewport-width);
+        --sheet-inner-max: min(var(--design-viewport-width), 100vw);
+        --sidebar-width: 80px;
+
+        --header-min-h: 54px;
+        --body-max-height: 600px;
+        --indicator-w: 2px;
+        --indicator-h: 24px;
+
+        --gradient-primary: linear-gradient(-17.76deg, rgb(255, 17, 160) 23.097%, rgb(255, 7, 119) 91.062%);
+
+        --sheet-motion-duration: 280ms;
+        --sheet-motion-easing: cubic-bezier(0.32, 0.72, 0, 1);
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+
+      body {
+        font-family: var(--font-stack);
+        background: var(--color-surface-tertiary);
+        color: var(--color-text-primary);
+      }
+
+      .app {
+        position: relative;
+        width: 100%;
+        max-width: var(--design-viewport-width);
+        min-height: 100%;
+        min-height: 100dvh;
+        margin-inline: auto;
+        display: flex;
+        flex-direction: column;
+        overflow-x: clip;
+      }
+
+      /**
+       * 主稿中「bg」为商品页屏摄，Figma MCP 导出为 JPEG；已落盘为本地资源，file:// 也可显示。
+       * 图标仍仅使用 assets/icons/*.svg。
+       */
+      .page-bg {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background-color: #ddd0da;
+        background-image: url('assets/images/page-bg.jpg');
+        background-size: cover;
+        background-position: center;
+      }
+
+      body.filters-sheet-dismissed .page-bg {
+        pointer-events: auto;
+        cursor: pointer;
+      }
+
+      /* 遮罩 — 不参与布局 */
+      .overlay {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 50%;
+        width: min(100vw, var(--design-viewport-width));
+        max-width: var(--design-viewport-width);
+        transform: translateX(-50%);
+        background: var(--color-overlay);
+        z-index: 1;
+        cursor: pointer;
+        opacity: 1;
+        transition: opacity var(--sheet-motion-duration) ease;
+      }
+
+      body.filters-sheet-dismissed .overlay,
+      body.sheet-is-entering:not(.sheet-is-entering-active) .overlay {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      body.sheet-is-exiting .overlay {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      /* 底部弹层 */
+      dialog.filter-sheet {
+        position: fixed;
+        inset: 0 auto 0 auto;
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+        width: min(100%, var(--sheet-inner-max));
+        max-height: calc(100dvh - env(safe-area-inset-top, 0px));
+        margin: 0;
+        padding: 0;
+        border: none;
+        background: transparent;
+        height: auto;
+        z-index: 2;
+        /* 半透明区域穿透到下方的 .overlay；仅对白底 sheet 接盘内事件 */
+        pointer-events: none;
+      }
+
+      .filter-sheet::backdrop {
+        background: transparent;
+      }
+
+      .sheet-panel {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: env(safe-area-inset-bottom, 0px);
+        display: flex;
+        flex-direction: column;
+        max-height: min(
+          calc(100dvh - env(safe-area-inset-top, 0px) - 80px),
+          calc(654 / 812 * 100vh)
+        );
+        border-radius: var(--radius-sheet-top) var(--radius-sheet-top) 0 0;
+        overflow: hidden;
+        box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
+        pointer-events: auto;
+        transform: translate3d(0, 0, 0);
+        transition: transform var(--sheet-motion-duration) var(--sheet-motion-easing);
+        will-change: transform;
+      }
+
+      body.filters-sheet-dismissed .sheet-panel,
+      body.sheet-is-exiting .sheet-panel,
+      body.sheet-is-entering:not(.sheet-is-entering-active) .sheet-panel {
+        transform: translate3d(0, 100%, 0);
+      }
+
+      body.filters-sheet-dismissed .filter-sheet {
+        pointer-events: none;
+      }
+
+      header.sheet-head {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        min-height: var(--header-min-h);
+        padding-block: var(--space-10);
+        padding-inline: var(--space-12);
+        background: var(--color-surface-default);
+        border-block-end: 0.5px solid var(--color-border-subtle);
+        border-radius: var(--radius-sheet-top) var(--radius-sheet-top) 0 0;
+        position: relative;
+      }
+
+      .sheet-title {
+        margin: 0;
+        max-width: 280px;
+        font-size: var(--title-page-size);
+        line-height: var(--title-page-lh);
+        font-weight: 500;
+        color: var(--color-text-primary);
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .sheet-close-btn {
+        position: absolute;
+        right: var(--space-12);
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        padding: 0;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+      }
+
+      .sheet-close-btn .icon-sheet-close {
+        width: 20px;
+        height: 20px;
+        display: block;
+      }
+
+      .sheet-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        background: var(--color-surface-default);
+        height: clamp(320px, min(var(--body-max-height), calc(100dvh - 220px)), var(--body-max-height));
+      }
+
+      .sheet-body-inner {
+        display: flex;
+        flex-direction: row;
+        align-items: stretch;
+        height: 100%;
+        min-height: 0;
+      }
+
+      /* 左侧导航 */
+      .sheet-sidebar {
+        flex: 0 0 var(--sidebar-width);
+        width: var(--sidebar-width);
+        max-width: 160px;
+        background: var(--color-surface-secondary);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+
+      .sheet-sidebar::-webkit-scrollbar {
+        display: none;
+        width: 0;
+        height: 0;
+      }
+
+      .sidebar-nav {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .sidebar-item {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: var(--space-4);
+        width: 100%;
+        padding: var(--space-12) var(--space-8);
+        border: none;
+        background: var(--color-surface-secondary);
+        cursor: pointer;
+        text-align: left;
+      }
+
+      .sidebar-item:focus-visible {
+        outline: 2px solid var(--color-brand);
+        outline-offset: -2px;
+      }
+
+      .sidebar-item.is-active {
+        background: var(--color-surface-default);
+      }
+
+      .sidebar-indicator {
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: var(--indicator-w);
+        height: var(--indicator-h);
+        border-radius: var(--radius-sidebar-indicator-v);
+        background: var(--color-brand);
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .sidebar-item.is-active .sidebar-indicator {
+        opacity: 1;
+      }
+
+      .sidebar-label {
+        max-width: 64px;
+        font-size: var(--sidebar-12-size);
+        line-height: var(--sidebar-12-lh);
+        font-weight: 400;
+        color: var(--color-text-secondary);
+        word-break: break-word;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .sidebar-item.is-active .sidebar-label {
+        font-weight: 500;
+        color: var(--color-brand);
+      }
+
+      .sidebar-badge {
+        flex-shrink: 0;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--color-brand);
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .sidebar-item.has-filter-selection .sidebar-badge {
+        opacity: 1;
+      }
+
+      /* 右侧滚动区 */
+      .feeds-scroll {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow-x: clip;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        scroll-behavior: smooth;
+        background: var(--color-surface-default);
+      }
+
+      .feeds-inner {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-16);
+        padding-block: 9px var(--space-16);
+        padding-inline: var(--space-12);
+      }
+
+      .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-12);
+        width: 100%;
+        max-width: 100%;
+      }
+
+      .filter-group-head {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        gap: var(--space-8);
+      }
+
+      .filter-group-title {
+        margin: 0;
+        font-size: var(--title-group-size);
+        line-height: var(--title-group-lh);
+        font-weight: 500;
+        color: var(--color-text-primary);
+        white-space: nowrap;
+      }
+
+      .filter-more {
+        display: inline-flex;
+        flex-direction: row;
+        align-items: center;
+        gap: var(--space-4);
+        border: none;
+        padding: 0;
+        background: transparent;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .filter-more-label {
+        font-size: var(--body-12-size);
+        line-height: var(--body-12-lh);
+        font-weight: 400;
+        color: var(--color-text-secondary);
+        white-space: nowrap;
+      }
+
+      .filter-more .icon-wrap {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        transform: scaleY(-1) rotate(0deg);
+        transition: transform 0.2s ease-out;
+      }
+
+      .filter-more.is-expanded .icon-wrap {
+        transform: scaleY(-1) rotate(180deg);
+      }
+
+      .icon-chevron-expand {
+        display: block;
+        width: 10px;
+        height: 10px;
+        object-fit: contain;
+      }
+
+      /* 与 .tag-row 行间距一致：抵消 .filter-group 的 gap，使第 4 行与前三行间距同为 var(--space-4) */
+      .filter-group--expandable .tag-row--extra.filter-extra-panel {
+        margin-top: calc(var(--space-4) - var(--space-12));
+        display: none;
+      }
+
+      .filter-group--expandable.is-expanded .tag-row--extra.filter-extra-panel {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-4);
+        align-items: flex-start;
+        animation: filterExtraAppear 0.38s ease-out;
+      }
+
+      @keyframes filterExtraAppear {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .filter-more .icon-wrap {
+          transition: none;
+        }
+        .chip {
+          transition: none;
+        }
+        .sheet-panel,
+        .overlay {
+          transition: none;
+        }
+        .filter-group--expandable.is-expanded .tag-row--extra.filter-extra-panel {
+          animation: none;
+        }
+      }
+
+      .chip-more-brand-inner .icon-wrap {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+
+      .tag-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-4);
+        align-items: flex-start;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        height: 36px;
+        min-height: 36px;
+        max-height: 36px;
+        padding: var(--space-6);
+        border: 1px solid transparent;
+        border-radius: var(--radius-label);
+        background: var(--color-surface-secondary);
+        cursor: pointer;
+        flex: 1 1 calc((100% - 2 * var(--space-4)) / 3);
+        max-width: calc((100% - 2 * var(--space-4)) / 3);
+        min-width: 0;
+        transition:
+          background-color 150ms ease-out,
+          border-color 150ms ease-out;
+      }
+
+      .chip.is-selected {
+        background: var(--color-brand-alpha-4);
+        border-color: var(--color-brand);
+      }
+
+      .chip.is-selected .chip-text {
+        color: var(--color-brand);
+        font-weight: 500;
+      }
+
+      .chip--duo {
+        flex: 1 1 calc((100% - 1 * var(--space-4)) / 2);
+        max-width: calc((100% - 1 * var(--space-4)) / 2);
+      }
+
+      .chip-text {
+        width: 100%;
+        max-height: 24px;
+        margin: 0;
+        font-size: var(--body-12-size);
+        line-height: 12px;
+        font-weight: 400;
+        text-align: center;
+        color: var(--color-text-primary);
+        overflow: hidden;
+        word-break: break-word;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+      }
+
+      .chip-text.is-placeholder {
+        color: var(--color-text-disabled);
+      }
+
+      .chip--more-brand {
+        flex: 1 1 calc((100% - 2 * var(--space-4)) / 3);
+        max-width: calc((100% - 2 * var(--space-4)) / 3);
+      }
+
+      .chip-more-brand-inner {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-4);
+      }
+
+      .chip-more-brand-inner span {
+        font-size: var(--body-12-size);
+        line-height: var(--body-12-lh);
+        font-weight: 400;
+        color: var(--color-text-secondary);
+        white-space: nowrap;
+      }
+
+      /* 价格区间：上为最低价/最高价双列，下为三列快捷价（对齐 Figma grid） */
+      .price-row {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+        width: 100%;
+      }
+
+      .price-pair-wrapper {
+        position: relative;
+        width: 100%;
+      }
+
+      .price-pair {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        column-gap: var(--space-12);
+        width: 100%;
+      }
+
+      .price-input {
+        width: 100%;
+        min-width: 0;
+        min-height: 36px;
+        margin: 0;
+        padding: var(--space-6);
+        border: 1px solid transparent;
+        border-radius: var(--radius-label);
+        background: var(--color-surface-secondary);
+        font-family: inherit;
+        font-size: var(--body-12-size);
+        line-height: var(--body-12-lh);
+        font-weight: 400;
+        text-align: center;
+        color: var(--color-text-primary);
+        -webkit-appearance: none;
+        appearance: none;
+      }
+
+      .price-input::placeholder {
+        color: var(--color-text-disabled);
+        font-weight: 400;
+      }
+
+      .price-input:focus {
+        outline: none;
+        border-color: var(--color-brand);
+        background: var(--color-brand-alpha-4);
+      }
+
+      .price-input:focus::placeholder {
+        color: var(--color-text-disabled);
+      }
+
+      .price-sep {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 8px;
+        height: 1px;
+        background: var(--color-inverse);
+        pointer-events: none;
+      }
+
+      /* Footer */
+      .sheet-footer {
+        flex: 0 0 auto;
+        background: var(--color-surface-default);
+        border-top: 0.5px solid var(--color-surface-tertiary);
+      }
+
+      .footer-actions {
+        display: flex;
+        flex-direction: row;
+        align-items: flex-start;
+        justify-content: center;
+        gap: var(--space-12);
+        padding: var(--space-12);
+      }
+
+      .btn-footer {
+        flex: 1 1 50%;
+        min-width: 72px;
+        max-width: 351px;
+        height: 48px;
+        padding: var(--space-14) var(--space-20);
+        border: none;
+        border-radius: var(--radius-footer-btn);
+        font-size: var(--footer-btn-size);
+        line-height: var(--footer-btn-lh);
+        font-family: inherit;
+        cursor: pointer;
+      }
+
+      .btn-reset {
+        background: var(--color-surface-secondary);
+        color: var(--color-text-primary);
+        font-weight: 400;
+      }
+
+      .btn-confirm {
+        background-image: var(--gradient-primary);
+        color: var(--color-surface-default);
+        font-weight: 500;
+      }
+
+      .home-indicator-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-end;
+        height: 34px;
+      }
+
+      .home-indicator-bar {
+        width: 135px;
+        height: 5px;
+        margin-bottom: 8px;
+        border-radius: 100px;
+        background: var(--color-text-primary);
+      }
+
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <div class="page-bg" id="page-bg" aria-hidden="true"></div>
+      <div id="filters-overlay" class="overlay" role="presentation" aria-hidden="true"></div>
+      <dialog class="filter-sheet" open aria-labelledby="filters-title">
+        <div class="sheet-panel">
+          <header class="sheet-head">
+            <h1 id="filters-title" class="sheet-title">全部筛选</h1>
+            <button type="button" class="sheet-close-btn" id="sheet-close-btn" aria-label="关闭">
+              <img class="icon-sheet-close" src="assets/icons/icon-line-edit-close.svg" width="20" height="20" alt="" />
+            </button>
+          </header>
+
+          <div class="sheet-body">
+            <div class="sheet-body-inner">
+              <aside class="sheet-sidebar">
+                <nav class="sidebar-nav" aria-label="筛选分类">
+                  <button type="button" class="sidebar-item is-active" data-target="filter-service" aria-controls="filter-service" aria-current="true">
+                    <span class="sidebar-indicator" aria-hidden="true"></span>
+                    <span class="sidebar-label">服务/物流</span>
+                    <span class="sidebar-badge" aria-hidden="true"></span>
+                  </button>
+                  <button type="button" class="sidebar-item" data-target="filter-price" aria-controls="filter-price">
+                    <span class="sidebar-indicator" aria-hidden="true"></span>
+                    <span class="sidebar-label">价格区间</span>
+                    <span class="sidebar-badge" aria-hidden="true"></span>
+                  </button>
+                  <button type="button" class="sidebar-item" data-target="filter-brand" aria-controls="filter-brand">
+                    <span class="sidebar-indicator" aria-hidden="true"></span>
+                    <span class="sidebar-label">品牌</span>
+                    <span class="sidebar-badge" aria-hidden="true"></span>
+                  </button>
+                  <button type="button" class="sidebar-item" data-target="filter-storage" aria-controls="filter-storage">
+                    <span class="sidebar-indicator" aria-hidden="true"></span>
+                    <span class="sidebar-label">机身内存</span>
+                    <span class="sidebar-badge" aria-hidden="true"></span>
+                  </button>
+                  <button type="button" class="sidebar-item" data-target="filter-screen-a" aria-controls="filter-screen-a">
+                    <span class="sidebar-indicator" aria-hidden="true"></span>
+                    <span class="sidebar-label">屏幕尺寸</span>
+                    <span class="sidebar-badge" aria-hidden="true"></span>
+                  </button>
+                  <button type="button" class="sidebar-item" data-target="filter-cpu" aria-controls="filter-cpu">
+                    <span class="sidebar-indicator" aria-hidden="true"></span>
+                    <span class="sidebar-label">CPU型号</span>
+                    <span class="sidebar-badge" aria-hidden="true"></span>
+                  </button>
+                  <button type="button" class="sidebar-item" data-target="filter-battery" aria-controls="filter-battery">
+                    <span class="sidebar-indicator" aria-hidden="true"></span>
+                    <span class="sidebar-label">电池容量</span>
+                    <span class="sidebar-badge" aria-hidden="true"></span>
+                  </button>
+                  <button type="button" class="sidebar-item" data-target="filter-charge" aria-controls="filter-charge">
+                    <span class="sidebar-indicator" aria-hidden="true"></span>
+                    <span class="sidebar-label">充电功率充电功率充电功率</span>
+                    <span class="sidebar-badge" aria-hidden="true"></span>
+                  </button>
+                  <button type="button" class="sidebar-item" data-target="filter-ram" aria-controls="filter-ram">
+                    <span class="sidebar-indicator" aria-hidden="true"></span>
+                    <span class="sidebar-label">运行内存</span>
+                    <span class="sidebar-badge" aria-hidden="true"></span>
+                  </button>
+                  <button type="button" class="sidebar-item" data-target="filter-screen-material" aria-controls="filter-screen-material">
+                    <span class="sidebar-indicator" aria-hidden="true"></span>
+                    <span class="sidebar-label">屏幕材质</span>
+                    <span class="sidebar-badge" aria-hidden="true"></span>
+                  </button>
+                  <button type="button" class="sidebar-item" data-target="filter-refresh" aria-controls="filter-refresh">
+                    <span class="sidebar-indicator" aria-hidden="true"></span>
+                    <span class="sidebar-label">刷新率</span>
+                    <span class="sidebar-badge" aria-hidden="true"></span>
+                  </button>
+                  <button type="button" class="sidebar-item" data-target="filter-water" aria-controls="filter-water">
+                    <span class="sidebar-indicator" aria-hidden="true"></span>
+                    <span class="sidebar-label">防水等级</span>
+                    <span class="sidebar-badge" aria-hidden="true"></span>
+                  </button>
+                  <button type="button" class="sidebar-item" data-target="filter-camera-main" aria-controls="filter-camera-main">
+                    <span class="sidebar-indicator" aria-hidden="true"></span>
+                    <span class="sidebar-label">主摄像素</span>
+                    <span class="sidebar-badge" aria-hidden="true"></span>
+                  </button>
+                  <button type="button" class="sidebar-item" data-target="filter-camera-front" aria-controls="filter-camera-front">
+                    <span class="sidebar-indicator" aria-hidden="true"></span>
+                    <span class="sidebar-label">前置摄像头像素</span>
+                    <span class="sidebar-badge" aria-hidden="true"></span>
+                  </button>
+                  <button type="button" class="sidebar-item" data-target="filter-other" aria-controls="filter-other">
+                    <span class="sidebar-indicator" aria-hidden="true"></span>
+                    <span class="sidebar-label">其他</span>
+                    <span class="sidebar-badge" aria-hidden="true"></span>
+                  </button>
+                </nav>
+              </aside>
+
+              <!-- 仅此区域纵向滚动 -->
+              <main class="feeds-scroll" id="filter-feeds-scroll" tabindex="0" role="region" aria-label="筛选项详情">
+                <div class="feeds-inner">
+                  <section class="filter-group" id="filter-service" tabindex="-1">
+                    <header class="filter-group-head"><h2 class="filter-group-title">服务/物流</h2></header>
+                    <div class="tag-row">
+                      <button type="button" class="chip"><p class="chip-text">唯品自营</p></button>
+                      <button type="button" class="chip"><p class="chip-text">次日达</p></button>
+                    </div>
+                  </section>
+
+                  <section class="filter-group" id="filter-price" tabindex="-1">
+                    <header class="filter-group-head"><h2 class="filter-group-title">价格区间</h2></header>
+                    <div class="price-row">
+                      <div class="price-pair-wrapper">
+                        <div class="price-pair">
+                          <input
+                            type="text"
+                            inputmode="decimal"
+                            class="price-input"
+                            id="price-min"
+                            placeholder="最低价"
+                            autocomplete="off"
+                            aria-label="最低价"
+                          />
+                          <input
+                            type="text"
+                            inputmode="decimal"
+                            class="price-input"
+                            id="price-max"
+                            placeholder="最高价"
+                            autocomplete="off"
+                            aria-label="最高价"
+                          />
+                        </div>
+                        <span class="price-sep" aria-hidden="true"></span>
+                      </div>
+                      <div class="tag-row price-range-row">
+                        <button type="button" class="chip"><p class="chip-text">¥800以下</p></button>
+                        <button type="button" class="chip"><p class="chip-text">¥800-¥1500</p></button>
+                        <button type="button" class="chip"><p class="chip-text">¥1500以上</p></button>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section class="filter-group" id="filter-brand" tabindex="-1">
+                    <header class="filter-group-head"><h2 class="filter-group-title">品牌</h2></header>
+                    <div class="tag-row">
+                      <button type="button" class="chip"><p class="chip-text">OPPO</p></button>
+                      <button type="button" class="chip"><p class="chip-text">小米</p></button>
+                      <button type="button" class="chip"><p class="chip-text">荣耀</p></button>
+                      <button type="button" class="chip"><p class="chip-text">华为</p></button>
+                      <button type="button" class="chip"><p class="chip-text">摩托罗拉索尼爱立信</p></button>
+                      <button type="button" class="chip"><p class="chip-text">realme</p></button>
+                      <button type="button" class="chip"><p class="chip-text">一加</p></button>
+                      <button type="button" class="chip"><p class="chip-text">魅族</p></button>
+                      <div class="chip chip--more-brand" role="presentation">
+                        <div class="chip-more-brand-inner">
+                          <span>更多品牌</span>
+                          <span class="icon-wrap" aria-hidden="true">
+                            <img class="icon-chevron-expand" src="assets/icons/icon-line-direction-arrow-right.svg" width="10" height="10" alt="" />
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section class="filter-group filter-group--expandable" id="filter-storage" tabindex="-1">
+                    <header class="filter-group-head">
+                      <h2 class="filter-group-title">机身内存</h2>
+                      <button type="button" class="filter-more" aria-expanded="false" aria-controls="filter-storage-extra" id="filter-storage-toggle">
+                        <span class="filter-more-label">展开</span>
+                        <span class="icon-wrap" aria-hidden="true">
+                          <img class="icon-chevron-expand" src="assets/icons/icon-line-direction-arrow-up.svg" width="10" height="10" alt="" />
+                        </span>
+                      </button>
+                    </header>
+                    <div class="tag-row tag-row--primary">
+                      <button type="button" class="chip"><p class="chip-text">1TB</p></button>
+                      <button type="button" class="chip"><p class="chip-text">512G</p></button>
+                      <button type="button" class="chip"><p class="chip-text">256G</p></button>
+                      <button type="button" class="chip"><p class="chip-text">128G</p></button>
+                      <button type="button" class="chip"><p class="chip-text">64G</p></button>
+                      <button type="button" class="chip"><p class="chip-text">32G及以下</p></button>
+                      <button type="button" class="chip"><p class="chip-text">云端扩容</p></button>
+                      <button type="button" class="chip"><p class="chip-text">混合存储套餐</p></button>
+                      <button type="button" class="chip"><p class="chip-text">可扩容卡槽</p></button>
+                    </div>
+                    <div
+                      class="tag-row tag-row--extra filter-extra-panel"
+                      id="filter-storage-extra"
+                      role="group"
+                      aria-labelledby="filter-storage-toggle"
+                      aria-hidden="true"
+                      hidden
+                    >
+                      <button type="button" class="chip"><p class="chip-text">2TB</p></button>
+                      <button type="button" class="chip"><p class="chip-text">企业定制</p></button>
+                      <button type="button" class="chip"><p class="chip-text">以旧换新</p></button>
+                    </div>
+                  </section>
+
+                  <section class="filter-group filter-group--expandable" id="filter-screen-a" tabindex="-1">
+                    <header class="filter-group-head">
+                      <h2 class="filter-group-title">屏幕尺寸</h2>
+                      <button type="button" class="filter-more" aria-expanded="false" aria-controls="filter-screen-a-extra"                       id="filter-screen-a-toggle">
+                        <span class="filter-more-label">展开</span>
+                        <span class="icon-wrap" aria-hidden="true">
+                          <img class="icon-chevron-expand" src="assets/icons/icon-line-direction-arrow-up.svg" width="10" height="10" alt="" />
+                        </span>
+                      </button>
+                    </header>
+                    <div class="tag-row tag-row--primary">
+                      <button type="button" class="chip"><p class="chip-text">7英寸以上</p></button>
+                      <button type="button" class="chip"><p class="chip-text">6.8-7.0英寸</p></button>
+                      <button type="button" class="chip"><p class="chip-text">6.8-7.0英寸</p></button>
+                      <button type="button" class="chip"><p class="chip-text">6.5-6.7英寸</p></button>
+                      <button type="button" class="chip"><p class="chip-text">6.3-6.5英寸</p></button>
+                      <button type="button" class="chip"><p class="chip-text">6.0-6.3英寸</p></button>
+                      <button type="button" class="chip"><p class="chip-text">5.5-6.0英寸</p></button>
+                      <button type="button" class="chip"><p class="chip-text">折叠内屏专享</p></button>
+                      <button type="button" class="chip"><p class="chip-text">小屏旗舰</p></button>
+                    </div>
+                    <div
+                      class="tag-row tag-row--extra filter-extra-panel"
+                      id="filter-screen-a-extra"
+                      role="group"
+                      aria-labelledby="filter-screen-a-toggle"
+                      aria-hidden="true"
+                      hidden
+                    >
+                      <button type="button" class="chip"><p class="chip-text">5.0-5.5英寸</p></button>
+                      <button type="button" class="chip"><p class="chip-text">平板尺寸</p></button>
+                      <button type="button" class="chip"><p class="chip-text">其他</p></button>
+                    </div>
+                  </section>
+
+                  <section class="filter-group filter-group--expandable" id="filter-screen-b" tabindex="-1">
+                    <header class="filter-group-head">
+                      <h2 class="filter-group-title">屏幕尺寸</h2>
+                      <button type="button" class="filter-more" aria-expanded="false" aria-controls="filter-screen-b-extra" id="filter-screen-b-toggle">
+                        <span class="filter-more-label">展开</span>
+                        <span class="icon-wrap" aria-hidden="true">
+                          <img class="icon-chevron-expand" src="assets/icons/icon-line-direction-arrow-up.svg" width="10" height="10" alt="" />
+                        </span>
+                      </button>
+                    </header>
+                    <div class="tag-row tag-row--primary">
+                      <button type="button" class="chip"><p class="chip-text">7英寸以上</p></button>
+                      <button type="button" class="chip"><p class="chip-text">6.8-7.0英寸</p></button>
+                      <button type="button" class="chip"><p class="chip-text">6.8-7.0英寸</p></button>
+                      <button type="button" class="chip"><p class="chip-text">6.5-6.7英寸</p></button>
+                      <button type="button" class="chip"><p class="chip-text">6.3-6.5英寸</p></button>
+                      <button type="button" class="chip"><p class="chip-text">6.0-6.3英寸</p></button>
+                      <button type="button" class="chip"><p class="chip-text">5.5-6.0英寸</p></button>
+                      <button type="button" class="chip"><p class="chip-text">折叠内屏专享</p></button>
+                      <button type="button" class="chip"><p class="chip-text">小屏旗舰</p></button>
+                    </div>
+                    <div
+                      class="tag-row tag-row--extra filter-extra-panel"
+                      id="filter-screen-b-extra"
+                      role="group"
+                      aria-labelledby="filter-screen-b-toggle"
+                      aria-hidden="true"
+                      hidden
+                    >
+                      <button type="button" class="chip"><p class="chip-text">5.0-5.5英寸</p></button>
+                      <button type="button" class="chip"><p class="chip-text">平板尺寸</p></button>
+                      <button type="button" class="chip"><p class="chip-text">其他</p></button>
+                    </div>
+                  </section>
+
+                  <section class="filter-group filter-group--expandable" id="filter-cpu" tabindex="-1">
+                    <header class="filter-group-head">
+                      <h2 class="filter-group-title">CPU型号</h2>
+                      <button type="button" class="filter-more" aria-expanded="false" aria-controls="filter-cpu-extra" id="filter-cpu-toggle">
+                        <span class="filter-more-label">展开</span>
+                        <span class="icon-wrap" aria-hidden="true">
+                          <img class="icon-chevron-expand" src="assets/icons/icon-line-direction-arrow-up.svg" width="10" height="10" alt="" />
+                        </span>
+                      </button>
+                    </header>
+                    <div class="tag-row tag-row--primary"></div>
+                    <div
+                      class="tag-row tag-row--extra filter-extra-panel"
+                      id="filter-cpu-extra"
+                      role="group"
+                      aria-labelledby="filter-cpu-toggle"
+                      aria-hidden="true"
+                      hidden
+                    >
+                    </div>
+                  </section>
+
+                  <section class="filter-group filter-group--expandable" id="filter-battery" tabindex="-1">
+                    <header class="filter-group-head">
+                      <h2 class="filter-group-title">电池容量</h2>
+                      <button type="button" class="filter-more" aria-expanded="false" aria-controls="filter-battery-extra" id="filter-battery-toggle">
+                        <span class="filter-more-label">展开</span>
+                        <span class="icon-wrap" aria-hidden="true">
+                          <img class="icon-chevron-expand" src="assets/icons/icon-line-direction-arrow-up.svg" width="10" height="10" alt="" />
+                        </span>
+                      </button>
+                    </header>
+                    <div class="tag-row tag-row--primary"></div>
+                    <div
+                      class="tag-row tag-row--extra filter-extra-panel"
+                      id="filter-battery-extra"
+                      role="group"
+                      aria-labelledby="filter-battery-toggle"
+                      aria-hidden="true"
+                      hidden
+                    >
+                    </div>
+                  </section>
+
+                  <section class="filter-group filter-group--expandable" id="filter-charge" tabindex="-1">
+                    <header class="filter-group-head">
+                      <h2 class="filter-group-title">充电功率</h2>
+                      <button type="button" class="filter-more" aria-expanded="false" aria-controls="filter-charge-extra" id="filter-charge-toggle">
+                        <span class="filter-more-label">展开</span>
+                        <span class="icon-wrap" aria-hidden="true">
+                          <img class="icon-chevron-expand" src="assets/icons/icon-line-direction-arrow-up.svg" width="10" height="10" alt="" />
+                        </span>
+                      </button>
+                    </header>
+                    <div class="tag-row tag-row--primary"></div>
+                    <div
+                      class="tag-row tag-row--extra filter-extra-panel"
+                      id="filter-charge-extra"
+                      role="group"
+                      aria-labelledby="filter-charge-toggle"
+                      aria-hidden="true"
+                      hidden
+                    >
+                    </div>
+                  </section>
+
+                  <section class="filter-group filter-group--expandable" id="filter-ram" tabindex="-1">
+                    <header class="filter-group-head">
+                      <h2 class="filter-group-title">运行内存</h2>
+                      <button type="button" class="filter-more" aria-expanded="false" aria-controls="filter-ram-extra" id="filter-ram-toggle">
+                        <span class="filter-more-label">展开</span>
+                        <span class="icon-wrap" aria-hidden="true">
+                          <img class="icon-chevron-expand" src="assets/icons/icon-line-direction-arrow-up.svg" width="10" height="10" alt="" />
+                        </span>
+                      </button>
+                    </header>
+                    <div class="tag-row tag-row--primary"></div>
+                    <div
+                      class="tag-row tag-row--extra filter-extra-panel"
+                      id="filter-ram-extra"
+                      role="group"
+                      aria-labelledby="filter-ram-toggle"
+                      aria-hidden="true"
+                      hidden
+                    >
+                    </div>
+                  </section>
+
+                  <section class="filter-group filter-group--expandable" id="filter-screen-material" tabindex="-1">
+                    <header class="filter-group-head">
+                      <h2 class="filter-group-title">屏幕材质</h2>
+                      <button type="button" class="filter-more" aria-expanded="false" aria-controls="filter-screen-material-extra" id="filter-screen-material-toggle">
+                        <span class="filter-more-label">展开</span>
+                        <span class="icon-wrap" aria-hidden="true">
+                          <img class="icon-chevron-expand" src="assets/icons/icon-line-direction-arrow-up.svg" width="10" height="10" alt="" />
+                        </span>
+                      </button>
+                    </header>
+                    <div class="tag-row tag-row--primary"></div>
+                    <div
+                      class="tag-row tag-row--extra filter-extra-panel"
+                      id="filter-screen-material-extra"
+                      role="group"
+                      aria-labelledby="filter-screen-material-toggle"
+                      aria-hidden="true"
+                      hidden
+                    >
+                    </div>
+                  </section>
+
+                  <section class="filter-group filter-group--expandable" id="filter-refresh" tabindex="-1">
+                    <header class="filter-group-head">
+                      <h2 class="filter-group-title">刷新率</h2>
+                      <button type="button" class="filter-more" aria-expanded="false" aria-controls="filter-refresh-extra" id="filter-refresh-toggle">
+                        <span class="filter-more-label">展开</span>
+                        <span class="icon-wrap" aria-hidden="true">
+                          <img class="icon-chevron-expand" src="assets/icons/icon-line-direction-arrow-up.svg" width="10" height="10" alt="" />
+                        </span>
+                      </button>
+                    </header>
+                    <div class="tag-row tag-row--primary"></div>
+                    <div
+                      class="tag-row tag-row--extra filter-extra-panel"
+                      id="filter-refresh-extra"
+                      role="group"
+                      aria-labelledby="filter-refresh-toggle"
+                      aria-hidden="true"
+                      hidden
+                    >
+                    </div>
+                  </section>
+
+                  <section class="filter-group filter-group--expandable" id="filter-water" tabindex="-1">
+                    <header class="filter-group-head">
+                      <h2 class="filter-group-title">防水等级</h2>
+                      <button type="button" class="filter-more" aria-expanded="false" aria-controls="filter-water-extra" id="filter-water-toggle">
+                        <span class="filter-more-label">展开</span>
+                        <span class="icon-wrap" aria-hidden="true">
+                          <img class="icon-chevron-expand" src="assets/icons/icon-line-direction-arrow-up.svg" width="10" height="10" alt="" />
+                        </span>
+                      </button>
+                    </header>
+                    <div class="tag-row tag-row--primary"></div>
+                    <div
+                      class="tag-row tag-row--extra filter-extra-panel"
+                      id="filter-water-extra"
+                      role="group"
+                      aria-labelledby="filter-water-toggle"
+                      aria-hidden="true"
+                      hidden
+                    >
+                    </div>
+                  </section>
+
+                  <section class="filter-group filter-group--expandable" id="filter-camera-main" tabindex="-1">
+                    <header class="filter-group-head">
+                      <h2 class="filter-group-title">主摄像素</h2>
+                      <button type="button" class="filter-more" aria-expanded="false" aria-controls="filter-camera-main-extra" id="filter-camera-main-toggle">
+                        <span class="filter-more-label">展开</span>
+                        <span class="icon-wrap" aria-hidden="true">
+                          <img class="icon-chevron-expand" src="assets/icons/icon-line-direction-arrow-up.svg" width="10" height="10" alt="" />
+                        </span>
+                      </button>
+                    </header>
+                    <div class="tag-row tag-row--primary"></div>
+                    <div
+                      class="tag-row tag-row--extra filter-extra-panel"
+                      id="filter-camera-main-extra"
+                      role="group"
+                      aria-labelledby="filter-camera-main-toggle"
+                      aria-hidden="true"
+                      hidden
+                    >
+                    </div>
+                  </section>
+
+                  <section class="filter-group filter-group--expandable" id="filter-camera-front" tabindex="-1">
+                    <header class="filter-group-head">
+                      <h2 class="filter-group-title">前置摄像头像素</h2>
+                      <button type="button" class="filter-more" aria-expanded="false" aria-controls="filter-camera-front-extra" id="filter-camera-front-toggle">
+                        <span class="filter-more-label">展开</span>
+                        <span class="icon-wrap" aria-hidden="true">
+                          <img class="icon-chevron-expand" src="assets/icons/icon-line-direction-arrow-up.svg" width="10" height="10" alt="" />
+                        </span>
+                      </button>
+                    </header>
+                    <div class="tag-row tag-row--primary"></div>
+                    <div
+                      class="tag-row tag-row--extra filter-extra-panel"
+                      id="filter-camera-front-extra"
+                      role="group"
+                      aria-labelledby="filter-camera-front-toggle"
+                      aria-hidden="true"
+                      hidden
+                    >
+                    </div>
+                  </section>
+
+                  <section class="filter-group filter-group--expandable" id="filter-other" tabindex="-1">
+                    <header class="filter-group-head">
+                      <h2 class="filter-group-title">其他</h2>
+                      <button type="button" class="filter-more" aria-expanded="false" aria-controls="filter-other-extra" id="filter-other-toggle">
+                        <span class="filter-more-label">展开</span>
+                        <span class="icon-wrap" aria-hidden="true">
+                          <img class="icon-chevron-expand" src="assets/icons/icon-line-direction-arrow-up.svg" width="10" height="10" alt="" />
+                        </span>
+                      </button>
+                    </header>
+                    <div class="tag-row tag-row--primary"></div>
+                    <div
+                      class="tag-row tag-row--extra filter-extra-panel"
+                      id="filter-other-extra"
+                      role="group"
+                      aria-labelledby="filter-other-toggle"
+                      aria-hidden="true"
+                      hidden
+                    >
+                    </div>
+                  </section>
+                </div>
+              </main>
+            </div>
+          </div>
+
+          <footer class="sheet-footer">
+            <div class="footer-actions">
+              <button type="button" class="btn-footer btn-reset" id="btn-reset">重置</button>
+              <button type="button" class="btn-footer btn-confirm" id="btn-confirm">确定</button>
+            </div>
+            <div class="home-indicator-wrap" aria-hidden="true">
+              <div class="home-indicator-bar"></div>
+            </div>
+          </footer>
+        </div>
+      </dialog>
+    </div>
+
+    <script>
+      (function () {
+        /** @typedef {{ scrollContainer: HTMLElement, sidebarButtons: HTMLElement[] }} FilterSheetRefs */
+
+        /**
+         * 创建单行筛选胶囊按钮节点。
+         * @param {string} label 展示文案
+         * @returns {HTMLButtonElement}
+         */
+        function makeChipButton(label) {
+          const chip = document.createElement('button')
+          chip.type = 'button'
+          chip.className = 'chip'
+          const p = document.createElement('p')
+          p.className = 'chip-text'
+          p.textContent = label
+          chip.appendChild(p)
+          return chip
+        }
+
+        /** @type {Record<string, { primary: string[], extra: string[] }>} */
+        const EXPAND_DYNAMIC_CHIPS = {
+          'filter-cpu': {
+            primary: [
+              '骁龙8至尊版',
+              '骁龙8 Gen3',
+              '骁龙7+ Gen3',
+              '天玑9400',
+              '天玑9300+',
+              '天玑9200+',
+              'A18 Pro',
+              'A17 Pro',
+              '麒麟9020',
+            ],
+            extra: ['Exynos 2400', '展锐 T820', '其他'],
+          },
+          'filter-battery': {
+            primary: [
+              '7000mAh以上',
+              '6000–7000mAh',
+              '5500–6000mAh',
+              '5000–5500mAh',
+              '4500–5000mAh',
+              '4000–4500mAh',
+              '3500–4000mAh',
+              '百瓦快充套装',
+              '硅碳负极方案',
+            ],
+            extra: ['无线双充', '磁吸充电', '其他'],
+          },
+          'filter-charge': {
+            primary: [
+              '200W及以上',
+              '120W',
+              '100W',
+              '90W',
+              '80W',
+              '67W',
+              '45W',
+              '33W及以下',
+              '无线快充',
+            ],
+            extra: ['双口协议', '车充套装', '其他'],
+          },
+          'filter-ram': {
+            primary: ['24GB', '16GB', '12GB', '10GB', '8GB', '6GB及以下', 'LPDDR5X', 'LPDDR5', 'UFS4.0'],
+            extra: ['虚拟扩展', '电竞模式', '其他'],
+          },
+          'filter-screen-material': {
+            primary: [
+              'AMOLED',
+              '柔性OLED',
+              '直屏优选',
+              'LTPO 2.0',
+              '高频PWM调光',
+              '康宁Victus',
+              '耐刮纳米晶',
+              '抗反射镀膜',
+              '微曲屏',
+            ],
+            extra: ['全等深微曲', '类纸护眼', '其他'],
+          },
+          'filter-refresh': {
+            primary: [
+              '165Hz',
+              '144Hz',
+              '120Hz',
+              '自适应1–120Hz',
+              '90Hz',
+              '60Hz稳定',
+              '游戏超帧',
+              '视频补帧',
+              '插黑帧',
+            ],
+            extra: ['阅读模式', '影院模式', '其他'],
+          },
+          'filter-water': {
+            primary: ['IP68', 'IP65', '生活防水', '防泼溅', '纳米镀膜', '疏油层', '防尘网', '海岛级', '游泳级'],
+            extra: ['雨雾模式', '水下摄影', '其他'],
+          },
+          'filter-camera-main': {
+            primary: [
+              '2亿像素',
+              '1亿像素',
+              '5000万',
+              '6400万',
+              '4800万',
+              '长焦潜望',
+              '大底主摄',
+              '光学防抖',
+              '人文焦段',
+            ],
+            extra: ['徕卡/哈苏联合', '可变光圈', '其他'],
+          },
+          'filter-camera-front': {
+            primary: [
+              '5000万',
+              '3200万',
+              '1600万',
+              '1200万',
+              '1080万',
+              '800万',
+              '自动对焦',
+              '夜景自拍',
+              '超广角同框',
+            ],
+            extra: ['仿生美颜', '人像虚化', '其他'],
+          },
+          'filter-other': {
+            primary: ['5G', '双卡双待', 'NFC', '红外遥控', '立体声双扬', 'X轴线性马达', '屏下指纹', '3D结构光', 'UWB车钥匙'],
+            extra: ['卫星消息', 'eSIM', '其他'],
+          },
+        }
+
+        /**
+         * 为仅有空容器的可展开区块填充「默认 3 行（9 项）+ 展开再露出 1 行（3 项）」示例数据。
+         * @returns {void}
+         */
+        function hydrateDynamicExpandRows() {
+          Object.entries(EXPAND_DYNAMIC_CHIPS).forEach(([id, rows]) => {
+            const sec = document.getElementById(id)
+            if (!sec) return
+            const pRow = sec.querySelector('.tag-row--primary')
+            const eRow = sec.querySelector('.tag-row--extra')
+            if (!pRow || !eRow) return
+            if (pRow.childElementCount > 0 || eRow.childElementCount > 0) return
+            rows.primary.forEach((t) => pRow.appendChild(makeChipButton(t)))
+            rows.extra.forEach((t) => eRow.appendChild(makeChipButton(t)))
+            if (eRow.childElementCount === 0) {
+              console.warn('[filters] extra chips empty after hydrate:', id)
+            }
+          })
+        }
+
+        /**
+         * 同步可展开区块的展开态：section 样式、按钮箭头、extra 显隐与无障碍属性。
+         * @param {HTMLButtonElement} btn 「展开」按钮
+         * @param {HTMLElement} group 所属 .filter-group--expandable
+         * @param {HTMLElement} extra 额外标签行容器
+         * @param {boolean} expanded 是否展开
+         * @returns {void}
+         */
+        function setExpandGroupState(btn, group, extra, expanded) {
+          group.classList.toggle('is-expanded', expanded)
+          btn.classList.toggle('is-expanded', expanded)
+          btn.setAttribute('aria-expanded', String(expanded))
+          const label = btn.querySelector('.filter-more-label')
+          if (label) label.textContent = expanded ? '收起' : '展开'
+          extra.hidden = !expanded
+          extra.setAttribute('aria-hidden', String(!expanded))
+          if (expanded) {
+            window.requestAnimationFrame(() => {
+              extra.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+            })
+          }
+        }
+
+        /**
+         * 绑定「展开 / 收起」：切换文案与箭头；展开时显示额外标签行，收起时仅保留默认 3 行（9 项）。
+         * @returns {void}
+         */
+        function initExpandCollapse() {
+          document.querySelectorAll('.filter-group--expandable .filter-more').forEach((btn) => {
+            const group = btn.closest('.filter-group--expandable')
+            const ctrl = btn.getAttribute('aria-controls')
+            const extra = ctrl ? document.getElementById(ctrl) : null
+            if (!group || !extra) return
+            extra.hidden = true
+            extra.setAttribute('aria-hidden', 'true')
+            btn.addEventListener('click', (ev) => {
+              ev.preventDefault()
+              const expanded = !group.classList.contains('is-expanded')
+              setExpandGroupState(btn, group, extra, expanded)
+            })
+          })
+        }
+
+        /**
+         * 判断节点是否为可点击的筛选标签按钮。
+         * @param {Element | null} el 点击目标或祖先节点
+         * @returns {el is HTMLButtonElement}
+         */
+        function isSelectableChip(el) {
+          return el instanceof HTMLButtonElement && el.classList.contains('chip')
+        }
+
+        /**
+         * 设置单个标签的选中态与无障碍属性。
+         * @param {HTMLButtonElement} chip 筛选标签按钮
+         * @param {boolean} selected 是否选中
+         * @returns {void}
+         */
+        function setChipSelected(chip, selected) {
+          chip.classList.toggle('is-selected', selected)
+          chip.setAttribute('aria-pressed', String(selected))
+        }
+
+        /**
+         * 切换标签选中态（支持多选与反选）。
+         * @param {HTMLButtonElement} chip 筛选标签按钮
+         * @returns {void}
+         */
+        function toggleChip(chip) {
+          setChipSelected(chip, !chip.classList.contains('is-selected'))
+          syncSidebarBadges()
+        }
+
+        /**
+         * 判断价格输入框是否含有有效数字（用于侧栏红点，非标签选中态）。
+         * @param {HTMLInputElement} input 最低价或最高价输入框
+         * @returns {boolean}
+         */
+        function priceInputHasNumber(input) {
+          const raw = input.value.trim()
+          if (!raw) return false
+          const n = Number(raw.replace(/,/g, ''))
+          return Number.isFinite(n)
+        }
+
+        /**
+         * 判断某个筛选分类区块是否存在有效筛选（已选标签或价格数字）。
+         * @param {HTMLElement | null} section filter-group 区块
+         * @returns {boolean}
+         */
+        function sectionHasFilterSelection(section) {
+          if (!section) return false
+          if (section.id === 'filter-price') {
+            const minEl = document.getElementById('price-min')
+            const maxEl = document.getElementById('price-max')
+            if (minEl instanceof HTMLInputElement && priceInputHasNumber(minEl)) return true
+            if (maxEl instanceof HTMLInputElement && priceInputHasNumber(maxEl)) return true
+          }
+          return !!section.querySelector('button.chip.is-selected')
+        }
+
+        /**
+         * 根据各分类区块内是否有已选标签或价格数字，同步侧栏红点（has-filter-selection）。
+         * 侧栏 data-target 仅映射主 section；filter-screen-b 等未锚定项不参与红点。
+         * @returns {void}
+         */
+        function syncSidebarBadges() {
+          document.querySelectorAll('.sidebar-item[data-target]').forEach((item) => {
+            const targetId = item.getAttribute('data-target')
+            const section = targetId ? document.getElementById(targetId) : null
+            item.classList.toggle('has-filter-selection', sectionHasFilterSelection(section))
+          })
+        }
+
+        /**
+         * 清除全部标签选中态、价格输入，并更新侧栏红点。
+         * @returns {void}
+         */
+        function clearAllChipSelections() {
+          document.querySelectorAll('button.chip.is-selected').forEach((chip) => {
+            setChipSelected(/** @type {HTMLButtonElement} */ (chip), false)
+          })
+          document.querySelectorAll('.price-input').forEach((input) => {
+            if (input instanceof HTMLInputElement) input.value = ''
+          })
+          syncSidebarBadges()
+        }
+
+        /**
+         * 绑定最低价/最高价输入：有数字时点亮「价格区间」侧栏红点，不参与标签多选。
+         * @returns {void}
+         */
+        function initPriceInputs() {
+          /** @param {HTMLInputElement} input */
+          const onPriceInput = (input) => {
+            syncSidebarBadges()
+          }
+
+          document.querySelectorAll('.price-input').forEach((el) => {
+            if (!(el instanceof HTMLInputElement)) return
+            el.addEventListener('input', () => onPriceInput(el))
+            el.addEventListener('change', () => onPriceInput(el))
+          })
+        }
+
+        /**
+         * 在右侧滚动区委托标签点击：多选、反选，并刷新侧栏红点。
+         * @param {HTMLElement} scrollEl feeds 滚动容器（#filter-feeds-scroll）
+         * @returns {void}
+         */
+        function initChipSelection(scrollEl) {
+          scrollEl.addEventListener('click', (ev) => {
+            const chip = ev.target instanceof Element ? ev.target.closest('button.chip') : null
+            if (!isSelectableChip(chip)) return
+            toggleChip(chip)
+          })
+
+          document.querySelectorAll('button.chip').forEach((chip) => {
+            if (!chip.hasAttribute('aria-pressed')) chip.setAttribute('aria-pressed', 'false')
+          })
+        }
+
+        /**
+         * Sets which sidebar nav item visually appears selected; does not scroll the panel.
+         * @param {HTMLElement} sidebarButtons Selected collection of sidebar buttons (may be stale each call).
+         * @param {HTMLElement} activeBtn Button to activate
+         */
+        function setActiveSidebar(sidebarButtons, activeBtn) {
+          sidebarButtons.forEach((btn) => {
+            const isSel = btn === activeBtn
+            btn.classList.toggle('is-active', isSel)
+            if (isSel) btn.setAttribute('aria-current', 'true')
+            else btn.removeAttribute('aria-current')
+          })
+        }
+
+        /** 程序化滚动右侧内容时，短暂忽略 scroll spy，避免与点击侧栏冲突。 */
+        let feedsScrollSpyLockUntil = 0
+
+        /**
+         * 将 section id 映射为侧栏 data-target（filter-screen-b 对应「屏幕尺寸」）。
+         * @param {string} sectionId 右侧区块 id
+         * @returns {string}
+         */
+        function mapSectionToSidebarTarget(sectionId) {
+          if (sectionId === 'filter-screen-b') return 'filter-screen-a'
+          return sectionId
+        }
+
+        /**
+         * 计算侧栏按钮在 sidebar 滚动容器内的 scrollTop 目标值。
+         * @param {HTMLElement} sidebarScroll 侧栏滚动容器
+         * @param {HTMLElement} sidebarBtn 侧栏按钮
+         * @returns {number}
+         */
+        function getSidebarBtnScrollTop(sidebarScroll, sidebarBtn) {
+          const scrollRect = sidebarScroll.getBoundingClientRect()
+          const btnRect = sidebarBtn.getBoundingClientRect()
+          return btnRect.top - scrollRect.top + sidebarScroll.scrollTop
+        }
+
+        /**
+         * 将侧栏当前高亮项滚入左侧 sidebar 可视区域（点击侧栏时使用）。
+         * @param {HTMLElement} sidebarBtn 侧栏按钮
+         * @returns {void}
+         */
+        function scrollSidebarItemIntoView(sidebarBtn) {
+          const sidebarScroll = document.querySelector('.sheet-sidebar')
+          if (!sidebarScroll) return
+          const pad = 8
+          const targetTop = Math.max(0, getSidebarBtnScrollTop(sidebarScroll, sidebarBtn) - pad)
+          sidebarScroll.scrollTo({ top: targetTop, behavior: 'smooth' })
+        }
+
+        /**
+         * 按右侧滚动进度比例联动左侧 sidebar 纵向滚动（随内容一起「往上滑」）。
+         * @param {HTMLElement} scrollEl feeds 滚动容器
+         * @returns {void}
+         */
+        function syncSidebarScrollWithFeeds(scrollEl) {
+          const sidebarScroll = document.querySelector('.sheet-sidebar')
+          if (!sidebarScroll) return
+
+          const feedsMax = scrollEl.scrollHeight - scrollEl.clientHeight
+          const sidebarMax = sidebarScroll.scrollHeight - sidebarScroll.clientHeight
+          if (feedsMax <= 0 || sidebarMax <= 0) return
+
+          const ratio = scrollEl.scrollTop / feedsMax
+          sidebarScroll.scrollTop = ratio * sidebarMax
+        }
+
+        /**
+         * 根据右侧滚动位置更新侧栏高亮项。
+         * @param {HTMLElement} scrollEl feeds 滚动容器
+         * @returns {HTMLElement | null} 当前高亮对应的侧栏按钮
+         */
+        function updateSidebarActiveFromFeeds(scrollEl) {
+          const sections = Array.from(scrollEl.querySelectorAll('.feeds-inner > section.filter-group'))
+          if (sections.length === 0) return null
+
+          const anchorY = scrollEl.getBoundingClientRect().top + Math.min(72, scrollEl.clientHeight * 0.2)
+          let activeSection = sections[0]
+          for (const sec of sections) {
+            if (sec.getBoundingClientRect().top <= anchorY) {
+              activeSection = sec
+            }
+          }
+
+          const targetId = mapSectionToSidebarTarget(activeSection.id)
+          const sidebarBtn = document.querySelector(`.sidebar-item[data-target="${targetId}"]`)
+          if (!(sidebarBtn instanceof HTMLElement)) return null
+
+          setActiveSidebar(getSidebarButtons(), sidebarBtn)
+          return sidebarBtn
+        }
+
+        /**
+         * 右侧滚动：更新侧栏高亮 + 比例联动侧栏滚动。
+         * @param {HTMLElement} scrollEl feeds 滚动容器
+         * @returns {void}
+         */
+        function updateSidebarFromFeedsScroll(scrollEl) {
+          updateSidebarActiveFromFeeds(scrollEl)
+          syncSidebarScrollWithFeeds(scrollEl)
+        }
+
+        /**
+         * 监听右侧纵向滚动，联动侧栏高亮与侧栏自动滚动。
+         * @param {HTMLElement} scrollEl feeds 滚动容器
+         * @returns {void}
+         */
+        function initFeedsScrollSpy(scrollEl) {
+          let ticking = false
+          const onScroll = () => {
+            if (ticking) return
+            ticking = true
+            requestAnimationFrame(() => {
+              ticking = false
+              syncSidebarScrollWithFeeds(scrollEl)
+              if (Date.now() < feedsScrollSpyLockUntil) return
+              updateSidebarActiveFromFeeds(scrollEl)
+            })
+          }
+          scrollEl.addEventListener('scroll', onScroll, { passive: true })
+          updateSidebarFromFeedsScroll(scrollEl)
+        }
+
+        /**
+         * 将右侧区块滚到 feeds 顶部（点击侧栏时）；短暂锁定 scroll spy。
+         * @param {HTMLElement} scrollEl feeds 滚动容器
+         * @param {HTMLElement | null} section 目标 section
+         * @returns {void}
+         */
+        function scrollSectionIntoFeedsTop(scrollEl, section) {
+          if (!section) return
+          feedsScrollSpyLockUntil = Date.now() + 600
+          const top = section.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top + scrollEl.scrollTop
+          scrollEl.scrollTo({ top, behavior: 'smooth' })
+        }
+
+        /**
+         * Finds active sidebar buttons as a snapshot NodeList mapped to Array.
+         * @returns {HTMLElement[]}
+         */
+        function getSidebarButtons() {
+          return Array.from(document.querySelectorAll('.sidebar-item'))
+        }
+
+        /**
+         * 侧栏点击跳转对应区块；右侧滚动由 initFeedsScrollSpy 联动高亮与侧栏滚入。
+         * @param {HTMLElement} scrollEl feeds 滚动容器
+         * @returns {void}
+         */
+        function initSidebar(scrollEl) {
+          const sidebarRoot = document.querySelector('.sidebar-nav')
+          if (!sidebarRoot || !scrollEl) return
+
+          sidebarRoot.addEventListener('click', (ev) => {
+            const clicked = /** @type {HTMLElement} */ (ev.target instanceof Element ? ev.target.closest('.sidebar-item') : null)
+            if (!clicked) return
+            const id = clicked.getAttribute('data-target')
+            if (!id) return
+            setActiveSidebar(getSidebarButtons(), clicked)
+            const section = document.getElementById(id)
+            scrollSectionIntoFeedsTop(scrollEl, section)
+          })
+
+          initFeedsScrollSpy(scrollEl)
+        }
+
+        /** @type {number} */
+        let sheetMotionFallbackTimer = 0
+
+        /**
+         * 是否应跳过浮层进出场动画（系统减少动效偏好）。
+         * @returns {boolean}
+         */
+        function prefersReducedSheetMotion() {
+          return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        }
+
+        /**
+         * 等待 sheet-panel 位移动画结束或超时后执行回调。
+         * @param {() => void} done 动画结束回调
+         * @returns {void}
+         */
+        function afterSheetPanelTransition(done) {
+          const panel = document.querySelector('.sheet-panel')
+          if (!panel || prefersReducedSheetMotion()) {
+            done()
+            return
+          }
+          const finish = () => {
+            window.clearTimeout(sheetMotionFallbackTimer)
+            panel.removeEventListener('transitionend', onEnd)
+            done()
+          }
+          /** @param {TransitionEvent} e */
+          const onEnd = (e) => {
+            if (e.target !== panel || e.propertyName !== 'transform') return
+            finish()
+          }
+          panel.addEventListener('transitionend', onEnd)
+          sheetMotionFallbackTimer = window.setTimeout(finish, 360)
+        }
+
+        /**
+         * 打开筛选浮层：自下而上滑入，并显示蒙层。
+         * @param {Event | undefined} ev
+         * @returns {void}
+         */
+        function openFilterSheet(ev) {
+          if (ev) {
+            ev.preventDefault()
+            ev.stopPropagation()
+          }
+          if (!document.body.classList.contains('filters-sheet-dismissed')) return
+          if (document.body.classList.contains('sheet-is-entering')) return
+
+          const dlg = document.querySelector('dialog.filter-sheet')
+          const panel = document.querySelector('.sheet-panel')
+
+          if (dlg && !dlg.open) dlg.show()
+
+          /* 先锁定屏外，再移除 dismissed，避免一帧内跳到 translateY(0) */
+          document.body.classList.remove('sheet-is-exiting')
+          document.body.classList.add('sheet-is-entering')
+          document.body.classList.remove('filters-sheet-dismissed')
+
+          if (prefersReducedSheetMotion()) {
+            document.body.classList.add('sheet-is-entering-active')
+            document.body.classList.remove('sheet-is-entering', 'sheet-is-entering-active')
+            return
+          }
+
+          void panel?.getBoundingClientRect()
+
+          window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+              document.body.classList.add('sheet-is-entering-active')
+              afterSheetPanelTransition(() => {
+                document.body.classList.remove('sheet-is-entering', 'sheet-is-entering-active')
+              })
+            })
+          })
+        }
+
+        /**
+         * 收起筛选浮层：向下滑出并隐藏蒙层（离线 file://、本地服务器均可用）。
+         * @param {Event | undefined} ev 若为点击事件则阻止冒泡，避免宿主 iframe 等多重监听。
+         * @returns {void}
+         */
+        function dismissFilterSheet(ev) {
+          if (ev) {
+            ev.preventDefault()
+            ev.stopPropagation()
+          }
+          if (document.body.classList.contains('filters-sheet-dismissed')) return
+          if (document.body.classList.contains('sheet-is-exiting')) return
+
+          document.body.classList.remove('sheet-is-entering', 'sheet-is-entering-active')
+          document.body.classList.add('sheet-is-exiting')
+
+          afterSheetPanelTransition(() => {
+            const dlg = document.querySelector('dialog.filter-sheet')
+            document.body.classList.remove('sheet-is-exiting')
+            document.body.classList.add('filters-sheet-dismissed')
+            if (dlg && dlg.open) dlg.close()
+          })
+        }
+
+        /**
+         * 绑定顶栏关闭、遮罩、背景图进出场；不写 console，以避免点击一次产生多条冗余日志。
+         * @returns {void}
+         */
+        function initChromeControls() {
+          const closeBtn = document.getElementById('sheet-close-btn')
+          const overlay = document.getElementById('filters-overlay')
+          const pageBg = document.getElementById('page-bg')
+          const resetBtn = document.getElementById('btn-reset')
+          const confirmBtn = document.getElementById('btn-confirm')
+
+          closeBtn?.addEventListener('click', dismissFilterSheet)
+          overlay?.addEventListener('click', dismissFilterSheet)
+          pageBg?.addEventListener('click', openFilterSheet)
+          resetBtn?.addEventListener('click', (ev) => {
+            ev.preventDefault()
+            clearAllChipSelections()
+          })
+          confirmBtn?.addEventListener('click', () => {})
+        }
+
+        /** Bootstraps interactivity according to UX requirements. */
+        function boot() {
+          hydrateDynamicExpandRows()
+          initExpandCollapse()
+          initPriceInputs()
+          const scrollEl = document.getElementById('filter-feeds-scroll')
+          if (scrollEl) {
+            initChipSelection(scrollEl)
+            initSidebar(scrollEl)
+          }
+          initChromeControls()
+        }
+
+        boot()
+      })()
+    </script>
+  </body>
+</html>
